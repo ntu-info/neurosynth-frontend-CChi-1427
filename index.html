@@ -1,46 +1,440 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full">
 <head>
   <meta charset="UTF-8" />
-  <title>Fetch /terms Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Neuro API Frontend</title>
+  <!-- 從 CDN 載入 Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* 使用 Inter 字體 */
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    /* 簡易載入動畫 */
+    .spinner {
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      width: 24px;
+      height: 24px;
+      animation: spin 1s ease-in-out infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    /* 表格樣式調整 */
+    .results-table th, .results-table td {
+      padding: 12px 15px;
+      border-bottom: 1px solid #374151; /* gray-700 */
+      text-align: left;
+      vertical-align: top;
+    }
+    .results-table th {
+      background-color: #1F2937; /* gray-800 */
+      font-weight: 600;
+      color: #D1D5DB; /* gray-300 */
+    }
+    .results-table tr:last-child td {
+      border-bottom: none;
+    }
+    .results-table tr:hover td {
+      background-color: #374151; /* gray-700 */
+    }
+  </style>
+  <!-- 載入 Inter 字體 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body>
-  <h1>Fetch https://mil.psy.ntu.edu.tw:5000/terms</h1>
-  <button id="btn">Fetch again</button>
-  <pre id="out">Loading…</pre>
+<body class="bg-gray-900 text-gray-100 h-full antialiased">
+
+  <div class="container mx-auto p-4 md:p-8 max-w-7xl"> <!-- 增加最大寬度以容納表格 -->
+    <header class="mb-8">
+      <h1 class="text-4xl font-bold text-center text-white">Neuroscience API Explorer</h1>
+      <p class="text-center text-gray-400 mt-2">
+        <!-- 更新為 hpc 網址 -->
+        Frontend for <code class="bg-gray-700 text-sm p-1 rounded-md">https://hpc.psy.ntu.edu.tw:5000</code>
+      </p>
+    </header>
+
+    <!-- 變更：使用 Grid 系統進行 1/3 + 2/3 佈局 -->
+    <div class="space-y-8 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-8">
+      
+      <!-- 區塊 1: 詞彙瀏覽器 (合併後) -->
+      <!-- 變更：指定佔 1 欄 -->
+      <section class="bg-gray-800 shadow-xl rounded-lg p-6 lg:col-span-1">
+        <h2 class="text-2xl font-semibold mb-4 text-white">1. Term Explorer</h2>
+        <p class="text-gray-400 mb-4">
+          Type to search for terms (min. 2 chars). Click "Find" to get associated terms for an exact match.
+        </p>
+        <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+          <input type="text" id="input-term" placeholder="e.g. type 'amyg' to search or 'amygdala' to find" class="flex-grow w-full bg-gray-700 text-white border border-gray-600 rounded-md py-3 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <!-- 使用低飽和度顏色 -->
+          <button id="btn-assoc-terms" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-5 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+            </svg>
+            <span>Find Associated</span>
+          </button>
+        </div>
+        <div id="out-assoc-terms" class="mt-4 hidden"></div>
+        <!-- 使用低飽和度顏色 -->
+        <button id="btn-show-all-terms" class="w-full mt-4 bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 px-4 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 5h10v10H5V5z" />
+            <path d="M7 7h2v2H7V7zM7 11h2v2H7v-2zM11 7h2v2h-2V7zM11 11h2v2h-2v-2z" />
+          </svg>
+          <span>Show All Terms</span>
+        </button>
+      </section>
+
+      <!-- 區塊 2: 查詢研究 -->
+      <!-- 變更：指定佔 2 欄 -->
+      <section class="bg-gray-800 shadow-xl rounded-lg p-6 lg:col-span-2">
+        <h2 class="text-2xl font-semibold mb-4 text-white">2. Query Studies</h2>
+        <p class="text-gray-400 mb-4">Perform a logical search from <code class="bg-gray-700 text-sm p-1 rounded-md">/query/&lt;query_string&gt;/studies</code>.</p>
+        <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+          <input type="text" id="input-query" placeholder="e.g. amygdala not emotion" class="flex-grow w-full bg-gray-700 text-white border border-gray-600 rounded-md py-3 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <!-- 使用低飽和度顏色 -->
+          <button id="btn-query" class="bg-purple-700 hover:bg-purple-800 text-white font-bold py-3 px-5 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M9 9a2 2 0 114 0 2 2 0 01-4 0z" />
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm0 2c-5.523 0-10-4.477-10-10S4.477 0 10 0s10 4.477 10 10-4.477 10-10 10z" clip-rule="evenodd" />
+            </svg>
+            <span>Search</span>
+          </button>
+        </div>
+        <div id="out-query" class="mt-4 hidden"></div>
+      </section>
+    </div>
+
+    <footer class="text-center text-gray-500 mt-12 pb-8">
+      Built with Tailwind CSS & Vanilla JS
+    </footer>
+  </div>
 
   <script>
-    async function fetchTerms() {
-      const out = document.getElementById('out');
-      out.textContent = 'Requesting…';
-      try {
-        const resp = await fetch('https://mil.psy.ntu.edu.tw:5000/terms');
-        let info = `HTTP ${resp.status} ${resp.statusText}\n`;
-        const ct = resp.headers.get('content-type') || '';
+    // API 的基礎網址 (更新為 hpc)
+    const API_BASE_URL = 'https://hpc.psy.ntu.edu.tw:5000';
 
-        if (!resp.ok) {
-          const text = await resp.text();
-          out.textContent = info + '\n' + text;
+    // --- 全域變數 ---
+    let allTermsCache = [];
+    let isTermsCacheReady = false;
+    let currentQueryResults = []; // 新增：儲存研究查詢結果
+    let currentYearSortOrder = 'api'; // 新增：追蹤年份排序狀態 ('api', 'asc', 'desc')
+
+    // --- 獲取 DOM 元素參照 ---
+    const btnAssocTerms = document.getElementById('btn-assoc-terms');
+    const inputTerm = document.getElementById('input-term');
+    const outAssocTerms = document.getElementById('out-assoc-terms');
+    const btnShowAllTerms = document.getElementById('btn-show-all-terms');
+
+    const btnQuery = document.getElementById('btn-query');
+    const inputQuery = document.getElementById('input-query');
+    const outQuery = document.getElementById('out-query');
+
+    // --- 輔助函式 ---
+
+    /**
+     * 新增：處理詞彙列表中項目點擊的函式
+     * @param {string} term - 被點擊的詞彙
+     */
+    function selectTerm(term) {
+      inputTerm.value = term; // 設定輸入框的值
+      outAssocTerms.innerHTML = ''; // 清空列表
+      outAssocTerms.classList.add('hidden'); // 隱藏列表容器
+    }
+
+    /**
+     * 在指定的輸出元素中顯示載入訊息
+     * @param {HTMLElement} outEl - 輸出元素
+     */
+    function showLoading(outEl) {
+      outEl.innerHTML = `
+        <div class="flex items-center justify-center p-4">
+          <div class="spinner"></div>
+          <span class="ml-3 text-gray-300">Loading...</span>
+        </div>`;
+      outEl.classList.remove('hidden');
+    }
+
+    /**
+     * 在指定的輸出元素中顯示錯誤訊息
+     * @param {HTMLElement} outEl - 輸出元素
+     * @param {string} errorMsg - 要顯示的錯誤訊息
+     */
+    function showError(outEl, errorMsg) {
+      outEl.innerHTML = `
+        <div class="bg-red-900 border border-red-700 text-red-100 px-4 py-3 rounded-md">
+          <strong class="font-bold">Error:</strong>
+          <span class="block sm:inline">${errorMsg}</span>
+        </div>`;
+      outEl.classList.remove('hidden');
+    }
+
+    /**
+     * 新增：依年份排序研究查詢結果並重新渲染表格
+     */
+    function sortQueryResultsByYear() {
+      let sortedResults;
+      const sortBtn = document.getElementById('sort-by-year-btn');
+      const tableBody = document.getElementById('query-table-body');
+
+      if (!tableBody || !sortBtn) return; // 安全檢查
+
+      // 切換排序順序
+      if (currentYearSortOrder === 'api' || currentYearSortOrder === 'asc') {
+        currentYearSortOrder = 'desc';
+        sortBtn.innerHTML = 'Year &darr;'; // Down arrow
+        sortedResults = [...currentQueryResults].sort((a, b) => (b.year || 0) - (a.year || 0)); // 由新到舊
+      } else {
+        currentYearSortOrder = 'asc';
+        sortBtn.innerHTML = 'Year &uarr;'; // Up arrow
+        sortedResults = [...currentQueryResults].sort((a, b) => (a.year || 0) - (b.year || 0)); // 由舊到新
+      }
+
+      // 重新渲染表格內容
+      const rows = sortedResults.map(item => `
+        <tr>
+          <td class="text-gray-400">${item.year || ''}</td>
+          <td class="text-gray-300">${item.journal || ''}</td>
+          <td class="text-gray-300">${item.title || ''}</td>
+          <td class="text-gray-400 text-sm">${item.authors || ''}</td>
+        </tr>
+      `).join('');
+
+      tableBody.innerHTML = rows;
+    }
+
+    /**
+     * 在 <pre> 標籤中以美觀格式顯示 JSON 結果
+     * @param {HTMLElement} outEl - 輸出元素
+     * @param {object | Array} data - 要顯示的 JSON 資料或陣列
+     */
+    function showResult(outEl, data) {
+      let listData = null;
+
+      // 檢查 data.terms (用於 API 回傳的 "Get All Terms")
+      if (data && Array.isArray(data.terms)) {
+        listData = data.terms;
+      } 
+      // 檢查 data.related (用於 "Get Associated Terms")
+      else if (data && Array.isArray(data.related)) {
+        // 從物件陣列中只提取 "term"
+        listData = data.related.map(item => item.term);
+      }
+      // 檢查 data.results (用於 "Query Studies")
+      else if (data && Array.isArray(data.results)) {
+        
+        // 新增：儲存結果以供排序，並重設排序狀態
+        currentQueryResults = [...data.results];
+        currentYearSortOrder = 'api';
+
+        // 如果陣列是空的
+        if (data.results.length === 0) {
+          outEl.innerHTML = `<p class="text-gray-400 p-4 text-center">No results found.</p>`;
+          outEl.classList.remove('hidden');
           return;
         }
 
+        // 建立表格標頭
+        const headers = `
+          <thead>
+            <tr>
+              <!-- 新增：ID、cursor-pointer 和 hover 樣式 -->
+              <th id="sort-by-year-btn" class="cursor-pointer hover:bg-gray-700 transition-colors duration-150" style="width: 10%;">Year</th>
+              <th style="width: 25%;">Journal</th>
+              <th style="width: 35%;">Title</th>
+              <th style="width: 30%;">Authors</th>
+            </tr>
+          </thead>`;
+
+        // 建立表格內容
+        const rows = data.results.map(item => `
+          <tr>
+            <td class="text-gray-400">${item.year || ''}</td>
+            <td class="text-gray-300">${item.journal || ''}</td>
+            <td class="text-gray-300">${item.title || ''}</td>
+            <td class="text-gray-400 text-sm">${item.authors || ''}</td>
+          </tr>
+        `).join('');
+
+        // 組合完整的表格
+        outEl.innerHTML = `
+          <div class="bg-gray-950 rounded-lg overflow-x-auto shadow-md">
+            <table class="w-full results-table text-sm">
+              ${headers}
+              <!-- 新增：ID 以便 DOM 操作 -->
+              <tbody id="query-table-body">
+                ${rows}
+              </tbody>
+            </table>
+          </div>
+          <p class="text-sm text-gray-500 mt-2">Showing ${data.results.length} of ${data.count || data.results.length} results.</p>
+        `;
+        outEl.classList.remove('hidden');
+
+        // 新增：為排序按鈕加上事件監聽器
+        const sortBtn = document.getElementById('sort-by-year-btn');
+        if (sortBtn) {
+          sortBtn.addEventListener('click', sortQueryResultsByYear);
+        }
+
+        return; // 表格建立完成，提前返回
+      }
+      // 否則，檢查 data 本身是否就是一個陣列 (用於即時搜尋和快取顯示)
+      else if (Array.isArray(data)) {
+        listData = data;
+      }
+
+      // --- 列表顯示邏輯 (用於 Terms 和 Related) ---
+      if (listData) {
+        // 如果陣列是空的
+        if (listData.length === 0) {
+          outEl.innerHTML = `<p class="text-gray-400 p-4 text-center">No items found.</p>`;
+          outEl.classList.remove('hidden');
+          return;
+        }
+
+        // 建立一個項目符號列表 (<ul>)
+        const listItems = listData.map(item => {
+          // 逸出 ' 字元，以確保 onclick 屬性安全
+          const escapedItem = item.replace(/'/g, "\\'");
+          return `<li onclick="selectTerm('${escapedItem}')" class="cursor-pointer py-2 px-4 border-b border-gray-700 last:border-b-0 text-gray-300 hover:bg-gray-800 transition-colors duration-150">${item}</li>`;
+        }).join('');
+        
+        outEl.innerHTML = `
+          <ul class="bg-gray-950 rounded-md overflow-hidden max-h-80 overflow-y-auto text-sm list-none border border-gray-700">
+            ${listItems}
+          </ul>`;
+      } else {
+        // --- JSON 顯示邏G (用於 other all situations) ---
+        const content = JSON.stringify(data, null, 2);
+        outEl.innerHTML = `
+          <pre class="bg-gray-950 text-green-300 p-4 rounded-md overflow-x-auto max-h-96 text-sm">${content}</pre>`;
+      }
+      outEl.classList.remove('hidden');
+    }
+
+    /**
+     * 通用的 fetch 處理函式
+     * @param {string} url - 要 fetch 的網址
+     * @param {HTMLElement} outEl - 要更新的輸出元素
+     * @returns {Promise<object|null>} 回傳 JSON 資料或 null
+     */
+    async function handleFetch(url, outEl) {
+      showLoading(outEl);
+      try {
+        // 注意：使用 'cors' 模式。伺服器必須支援此設定。
+        const resp = await fetch(url, { mode: 'cors' });
+
+        if (!resp.ok) {
+          const errorText = await resp.text();
+          throw new Error(`HTTP ${resp.status} ${resp.statusText}: ${errorText || 'No error details'}`);
+        }
+
+        const ct = resp.headers.get('content-type') || '';
         if (ct.includes('application/json')) {
           const data = await resp.json();
-          out.textContent = info + '\n' + JSON.stringify(data, null, 2);
+          showResult(outEl, data);
+          return data; // Success, return data
         } else {
           const text = await resp.text();
-          out.textContent = info + '\n' + text;
+          showResult(outEl, { response: text }); // Wrap non-JSON text in object for consistent display
+          return { response: text }; // Also return
         }
       } catch (err) {
-        document.getElementById('out').textContent =
-          'Error: ' + (err && err.message ? err.message : String(err)) +
-          '\n\nCommon causes:\n1) CORS not allowed by the server\n2) Opening this file via file:// instead of a local server\n3) Network/server issues';
+        let errorMsg = err.message;
+        if (err instanceof TypeError) {
+            errorMsg = 'Network error or CORS issue. Check browser console (F12) for details. The server must send `Access-Control-Allow-Origin: *` header.';
+        }
+        showError(outEl, errorMsg);
+        console.error('Fetch Error:', err);
+        return null; // Return null on failure
       }
     }
 
-    document.getElementById('btn').addEventListener('click', fetchTerms);
-    fetchTerms();
+    /**
+     * 在頁面載入時擷取所有詞彙並存入快取
+     */
+    async function loadAllTermsCache() {
+      try {
+        const resp = await fetch(`${API_BASE_URL}/terms`, { mode: 'cors' });
+        if (!resp.ok) {
+          throw new Error(`HTTP ${resp.status}`);
+        }
+        const data = await resp.json();
+        if (data && Array.isArray(data.terms)) {
+          allTermsCache = data.terms;
+          isTermsCacheReady = true;
+          console.log('All terms cache loaded successfully.');
+        } else {
+          throw new Error('Invalid data format received for terms.');
+        }
+      } catch (err) {
+        console.error('Failed to load all terms cache:', err);
+        // Don't show error to user, just fail silently. Cache will remain not ready.
+      }
+    }
+
+    // --- 事件監聽器 ---
+
+    // 1. (合併) 相關詞彙 (Find按鈕)
+    btnAssocTerms.addEventListener('click', () => {
+      const term = inputTerm.value.trim();
+      if (!term) {
+        showError(outAssocTerms, 'Please enter a term to find associations.');
+        return;
+      }
+      // This part of the path doesn't need encoding, but browser handles it
+      handleFetch(`${API_BASE_URL}/terms/${term}`, outAssocTerms);
+    });
+
+    // 1. (合併) 即時搜尋 (Input輸入)
+    inputTerm.addEventListener('input', () => {
+      if (!isTermsCacheReady) {
+        return; // Don't search if cache isn't ready
+      }
+      
+      const query = inputTerm.value.trim().toLowerCase();
+      
+      // Hide results if string is too short
+      if (query.length < 2) {
+        outAssocTerms.innerHTML = '';
+        outAssocTerms.classList.add('hidden');
+        return;
+      }
+      
+      const matches = allTermsCache.filter(term => term.toLowerCase().startsWith(query));
+      showResult(outAssocTerms, matches); // Use showResult to display the filtered array
+    });
+
+    // 1. (合併) 顯示所有詞彙 (新按鈕)
+    btnShowAllTerms.addEventListener('click', () => {
+      if (isTermsCacheReady) {
+        showResult(outAssocTerms, allTermsCache);
+      } else {
+        // Fallback to API call if cache failed to load
+        handleFetch(`${API_BASE_URL}/terms`, outAssocTerms);
+      }
+    });
+
+    // 2. 查詢研究
+    btnQuery.addEventListener('click', () => {
+      const query = inputQuery.value.trim();
+      if (!query) {
+        showError(outQuery, 'Please enter a query string.');
+        return;
+      }
+      // Important: encode the query string to be URL-safe
+      const encodedQuery = encodeURIComponent(query);
+      handleFetch(`${API_BASE_URL}/query/${encodedQuery}/studies`, outQuery);
+    });
+
+    // --- 腳本初始化 ---
+    loadAllTermsCache(); // Start fetching term cache on page load
+
   </script>
 </body>
 </html>
-
